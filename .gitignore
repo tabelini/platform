@@ -389,3 +389,6 @@ Temporary Items
 # Local
 dokcer-compose.yml
 .env
+
+#Typescript dist folder
+dist/

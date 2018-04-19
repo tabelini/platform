@@ -1,9 +1,13 @@
 import {NestFactory} from '@nestjs/core';
 import {AppModule} from './app.module';
 import {DocumentBuilder, SwaggerModule} from '@nestjs/swagger';
+import {RolesGuard} from './webutils/Guards';
+import * as expressStatusMonitor from 'express-status-monitor';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
+    const rolesGuard = app.select(AppModule).get(RolesGuard)
+    app.useGlobalGuards(rolesGuard);
     const options = new DocumentBuilder()
         .setTitle('Platform API')
         .setDescription('Platform API description')
@@ -12,7 +16,8 @@ async function bootstrap() {
         .build();
     const document = SwaggerModule.createDocument(app, options);
     SwaggerModule.setup('/api-docs', app, document);
+    app.use(expressStatusMonitor());
     await app.listen(3000);
 }
 
-bootstrap();
+bootstrap().then(() => console.info('------------ Application Booted! -------------'));
