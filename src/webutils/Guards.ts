@@ -1,7 +1,7 @@
 import {CanActivate, ExecutionContext, Guard, ReflectMetadata} from '@nestjs/common';
 import {Observable} from 'rxjs/Observable';
 import {Reflector} from '@nestjs/core';
-import {User} from 'platform-domain';
+import {AuthenticationCredentials} from 'platform-domain';
 import {isNullOrUndefined} from 'util';
 
 export const Roles = (...roles: string[]) => ReflectMetadata('roles', roles);
@@ -17,7 +17,7 @@ export class RolesGuard implements CanActivate {
         if (!roles) {
             return true;
         }
-        const user: User = req.user;
-        return !isNullOrUndefined(user) && user.hasAnyRole(roles);
+        const auth: AuthenticationCredentials = req.auth;
+        return !isNullOrUndefined(auth) && (auth.hasAnyRole(roles) || auth.isRoot());
     }
 }

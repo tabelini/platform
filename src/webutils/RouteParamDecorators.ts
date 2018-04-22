@@ -1,5 +1,5 @@
 import { createRouteParamDecorator } from '@nestjs/common';
 
-export const CurrentUser = createRouteParamDecorator((data, req) => {
-    return req.user;
+export const Auth = createRouteParamDecorator((data, req) => {
+    return req.auth;
 });

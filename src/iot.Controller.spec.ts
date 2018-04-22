@@ -1,37 +1,36 @@
 import {Test, TestingModule} from '@nestjs/testing';
+import {IoTController} from './iotController';
 import {INestApplication} from '@nestjs/common';
-import {AppController} from './app.controller';
-import {AuthenticationCredentials, AuthenticationType} from 'platform-domain';
 import {AppModule} from './app.module';
 import request from 'supertest';
 
-describe('AppController', () => {
+describe('IoTController', () => {
     let app: TestingModule;
 
     beforeAll(async () => {
         app = await Test.createTestingModule({
-            controllers: [AppController],
+            controllers: [IoTController],
         }).compile();
     });
 
-    describe('root', () => {
-        const defaultAuth = new AuthenticationCredentials('id', 'customerId', ['ROLE_ROOT', 'ROLE_ADMIN'],
-            AuthenticationType.TOKEN);
-        it('should return the name and version of the Api"', () => {
-            const appController = app.get<AppController>(AppController);
-            expect(appController.apiInformation(defaultAuth).name).toEqual('Platform API');
-            expect(appController.apiInformation(defaultAuth).version).toEqual(process.env.npm_package_version);
+    describe('getServerTime', () => {
+        // const defaultAuth = new AuthenticationCredentials('id', 'customerId', ['ROLE_ROOT', 'ROLE_ADMIN'],
+        //     AuthenticationType.TOKEN);
+        it('should return the current server time', () => {
+            const controller = app.get<IoTController>(IoTController);
+            expect(controller.getServerTime().timeStamp).toBeLessThanOrEqual(Date.now() + 100);
+            expect(controller.getServerTime().timeStamp).toBeGreaterThanOrEqual(Date.now() - 100);
         });
     });
 });
 
-describe('AppController E2E', () => {
+describe('IotController E2E', () => {
     let app: INestApplication;
 
     beforeAll(async () => {
         const moduleFixture = await Test.createTestingModule({
             modules: [AppModule],
-            controllers: [AppController],
+            controllers: [IoTController],
         }).compile();
         app = moduleFixture.createNestApplication();
         await app.init();
