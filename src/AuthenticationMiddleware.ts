@@ -1,8 +1,10 @@
-import {ExpressMiddleware, Logger, NestMiddleware} from '@nestjs/common';
+import {ExpressMiddleware, Logger, Middleware, NestMiddleware} from '@nestjs/common';
 import {AuthenticationCredentials, AuthenticationType} from 'platform-domain';
-import {isNullOrUndefined} from 'util';
 import {RestForbiddenException} from './RestExceptions';
+import * as basicAuth from 'basic-auth';
+import {UserService} from './UserService';
 
+@Middleware()
 export class AuthenticationMiddleware implements NestMiddleware {
 
     static readonly apiKeyHeader = 'x-api_key';
@@ -17,16 +19,37 @@ export class AuthenticationMiddleware implements NestMiddleware {
     static readonly limitedUserAuth = new AuthenticationCredentials('id2', 'customerId2',
         ['ROLE_USER'], AuthenticationType.USER);
 
+    static isAuthNotRequired(url: string) {
+        console.log(`testing:${url}: ${url.startsWith('/api/auth/v1/gateway_key/')}`);
+        if (url.startsWith('/api/auth/v1/gateway_key/')) return true;
+        return false;
+    }
+
+    constructor(us: UserService) {
+
+    }
+
     readonly logger = new Logger('AuthenticationMiddleware');
 
     resolve(...args: any[]): ExpressMiddleware {
         return ((req, res, next) => {
-            if (req.headers) {
-                const apiKey = req.headers[AuthenticationMiddleware.apiKeyHeader];
-                if (apiKey) req.auth = AuthenticationMiddleware.defaultTokenAuth;
+            if (AuthenticationMiddleware.isAuthNotRequired(req.url)) next();
+            else {
+                if (req.headers) {
+                    const apiKey = req.headers[AuthenticationMiddleware.apiKeyHeader];
+                    if (apiKey) {
+                        req.auth = AuthenticationMiddleware.defaultTokenAuth;
+                    } else {
+                        if (req.headers.authorization) {
+                            const user = basicAuth(req);
+                            console.log(`User: ${JSON.stringify(user)}`);
+                        }
+                    }
+                }
+                if (!req.auth) throw new RestForbiddenException();
+                next();
             }
-            if (!req.auth) throw new RestForbiddenException();
-            next();
         });
     }
+
 }

@@ -5,3 +5,9 @@ export class RestForbiddenException extends HttpException{
         super(msg, HttpStatus.FORBIDDEN);
     }
 }
+
+export class RestNotFoundException extends HttpException{
+    constructor(msg = 'Not Found'){
+        super(msg, HttpStatus.NOT_FOUND);
+    }
+}

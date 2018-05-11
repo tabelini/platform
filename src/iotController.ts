@@ -1,7 +1,7 @@
 import {Roles} from './webutils/Guards';
 import {Body, Controller, Get, Logger, Param, Post} from '@nestjs/common';
 import {ApiBearerAuth, ApiModelProperty, ApiOperation, ApiResponse, ApiUseTags} from '@nestjs/swagger';
-import {IoTState, AuthenticationCredentials} from 'platform-domain';
+import {IoTState, AuthenticationCredentials, IoTSensor} from 'platform-domain';
 import {Auth} from './webutils/RouteParamDecorators';
 import {v4 as uuid} from 'uuid';
 import {IoTData} from '../../platform-domain/src/IoT';
@@ -23,6 +23,7 @@ export class IoTController {
 
     actualState: IoTState[] = [];
     actualData = new Map<string, Map<number, IoTData[]>>();
+    actualSensor = new Map<string, Map<number, IoTSensor[]>>();
 
     @ApiOperation({title: 'Server Time', description: 'Returns the server time in epoch'})
     @ApiResponse({status: 200, type: TimeResponse})
@@ -34,13 +35,39 @@ export class IoTController {
 
     @ApiOperation({title: 'Get the EndPoints state', description: 'Returns the required states for the endpoints'})
     @Get('/state')
+    @Roles('ROLE_ENDPOINT', 'ROLE_ADMIN')
     getEndPointState(@Auth() auth: AuthenticationCredentials): IoTState[] {
         return this.actualState.filter((value) => value.customerId === auth.customerId);
     }
 
     @ApiOperation({title: 'Set the Endpoints state', description: 'Returns the posted states'})
     @Post('/state')
+    @Roles('ROLE_ADMIN')
     postEndPointState(@Auth() auth: AuthenticationCredentials, @Body() states: IoTState[]): IoTState[] {
+        states.forEach((value) => {
+            value.customerId = auth.customerId;
+            value.id = uuid();
+            value.timestamp = Date.now();
+            this.actualState = this.actualState
+                .filter(state => {
+                    return (state.endPointId !== value.endPointId || state.actuatorId !== value.actuatorId);
+                });
+        });
+        this.actualState = this.actualState.concat(states);
+        return states;
+    }
+
+    @ApiOperation({title: 'Get the expected sensors', description: 'Returns the expected sensors for the endpoints'})
+    @Get('/sensors')
+    @Roles('ROLE_ENDPOINT', 'ROLE_ADMIN')
+    getEndPointSensors(@Auth() auth: AuthenticationCredentials): IoTSensor[] {
+        return this.actualSensor.filter((value) => value.customerId === auth.customerId);
+    }
+
+    @ApiOperation({title: 'Set the Endpoints state', description: 'Returns the posted states'})
+    @Post('/sensors')
+    @Roles('ROLE_ADMIN')
+    postEndPointSensor(@Auth() auth: AuthenticationCredentials, @Body() states: IoTState[]): IoTState[] {
         states.forEach((value) => {
             value.customerId = auth.customerId;
             value.id = uuid();
@@ -56,6 +83,7 @@ export class IoTController {
 
     @ApiOperation({title: 'Get the data for an given Endpoint', description: 'Returns the latest data for a given endpoint'})
     @Get('/data/:endPointId/sensor/:sensorId')
+    @Roles('ROLE_ADMIN')
     getEndpointData(@Param('endPointId') endPointId: string, @Param('sensorId') sensorId: string): IoTData[] {
         const endPointData = this.actualData.get(endPointId);
         if (!endPointData) {
@@ -72,6 +100,7 @@ export class IoTController {
 
     @ApiOperation({title: 'Post data for an endpoint', description: 'Returns the data posted for an given endpoint'})
     @Post('/data')
+    @Roles('ROLE_ENDPOINT', 'ROLE_ADMIN')
     postEndpointData(@Auth() auth: AuthenticationCredentials, @Body() data: IoTData[]): IoTData[] {
         data.sort((prev, next) => prev.timestamp - next.timestamp);
         data.forEach((val) => {
