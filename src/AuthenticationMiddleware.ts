@@ -43,7 +43,7 @@ export class AuthenticationMiddleware implements NestMiddleware {
                         if (req.headers.authorization) {
                             const auth = basicAuth(req);
                             const user = await this.us.findByUsernameAndPassword(auth.name, auth.pass);
-                            console.log(`User: ${JSON.stringify(user)}`);
+                            // console.log(`User: ${JSON.stringify(user)}`);
                             if (user) {
                                 req.auth = new AuthenticationCredentials(user.id, user.customerId, user.roles, AuthenticationType.USER);
                             }
