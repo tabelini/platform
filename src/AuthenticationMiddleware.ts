@@ -25,14 +25,14 @@ export class AuthenticationMiddleware implements NestMiddleware {
         return false;
     }
 
-    constructor(us: UserService) {
+    constructor(private us: UserService) {
 
     }
 
     readonly logger = new Logger('AuthenticationMiddleware');
 
     resolve(...args: any[]): ExpressMiddleware {
-        return ((req, res, next) => {
+        return (async (req, res, next) => {
             if (AuthenticationMiddleware.isAuthNotRequired(req.url)) next();
             else {
                 if (req.headers) {
@@ -41,8 +41,12 @@ export class AuthenticationMiddleware implements NestMiddleware {
                         req.auth = AuthenticationMiddleware.defaultTokenAuth;
                     } else {
                         if (req.headers.authorization) {
-                            const user = basicAuth(req);
+                            const auth = basicAuth(req);
+                            const user = await this.us.findByUsernameAndPassword(auth.name, auth.pass);
                             console.log(`User: ${JSON.stringify(user)}`);
+                            if (user) {
+                                req.auth = new AuthenticationCredentials(user.id, user.customerId, user.roles, AuthenticationType.USER);
+                            }
                         }
                     }
                 }

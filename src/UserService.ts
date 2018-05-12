@@ -14,16 +14,17 @@ export class UserService {
     constructor() {
         const salt = bcrypt.genSaltSync(10);
         this.rootUser = new User('rootId', 'customerId', 'root', 'root@email.com',
-            bcrypt.hash('root', salt), ['ROLE_ROOT']);
+            bcrypt.hashSync('root', salt), ['ROLE_ROOT']);
         this.defaultUser = new User('userId', 'customerId', 'username', 'username@email.com',
-            bcrypt.hash('username', salt), ['ROLE_ADMIN']);
+            bcrypt.hashSync('username', salt), ['ROLE_ADMIN']);
         this.users = [this.rootUser, this.defaultUser];
     }
 
     async findByUsernameAndPassword(username: string, password: string): Promise<User> {
-        const foundUser = this.users.find(user => user.username === username);
+        const foundUser = this.users.find(user => user.email === username);
+        // console.log(`username:${username}, password:${password} foundUser: ${JSON.stringify(foundUser)}`)
         if (!isNullOrUndefined(foundUser)) {
-            const match = await bcrypt.compare(password, user.passwordHash);
+            const match = await bcrypt.compare(password, foundUser.passwordHash);
             if (match) return foundUser;
         }
         return null;
