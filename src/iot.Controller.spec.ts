@@ -4,7 +4,7 @@ import {INestApplication} from '@nestjs/common';
 import {AppModule} from './app.module';
 import request from 'supertest';
 import {AuthenticationCredentials, AuthenticationType, IoTState} from 'platform-domain';
-import {IoTData} from '../../platform-domain/src/IoT';
+import {IoTData, IoTSensor} from '../../platform-domain';
 
 const defaultAuthentication = new AuthenticationCredentials('id', 'customerId',
     ['ROLE_ROOT'], AuthenticationType.TOKEN);
@@ -12,18 +12,18 @@ const defaultAuthentication = new AuthenticationCredentials('id', 'customerId',
 const anotherAuthentication = new AuthenticationCredentials('id', 'customerId2',
     ['ROLE_ROOT'], AuthenticationType.TOKEN);
 
-const defaultIoTState0 = new IoTState('endpointID', 'actuatorId0', 10);
-const defaultIoTState1 = new IoTState('endpointID', 'actuatorId1', 11);
-const defaultIoTState2 = new IoTState('endpointID', 'actuatorId2', 12);
-const defaultIoTState3 = new IoTState('endpointID', 'actuatorId3', 13);
+const defaultIoTState0 = new IoTState('endpointID', 0, 10);
+const defaultIoTState1 = new IoTState('endpointID', 1, 11);
+const defaultIoTState2 = new IoTState('endpointID', 2, 12);
+const defaultIoTState3 = new IoTState('endpointID', 3, 13);
 
-const defaultIoTState0_anotherId = new IoTState('endpointID', 'actuatorId0', 10,
+const defaultIoTState0_anotherId = new IoTState('endpointID', 0, 10,
     'id', 'customerId2');
-const defaultIoTState1_anotherId = new IoTState('endpointID', 'actuatorId1', 11,
+const defaultIoTState1_anotherId = new IoTState('endpointID', 1, 11,
     'id', 'customerId2');
-const defaultIoTState2_anotherId = new IoTState('endpointID', 'actuatorId2', 12,
+const defaultIoTState2_anotherId = new IoTState('endpointID', 2, 12,
     'id', 'customerId2');
-const defaultIoTState3_anotherId = new IoTState('endpointID', 'actuatorId3', 13,
+const defaultIoTState3_anotherId = new IoTState('endpointID', 3, 13,
     'id', 'customerId2');
 
 const defaultIoTStates = [defaultIoTState0, defaultIoTState1, defaultIoTState2, defaultIoTState3];
@@ -31,9 +31,9 @@ const defaultIoTStates = [defaultIoTState0, defaultIoTState1, defaultIoTState2, 
 const defaultIoTStatesAnotherId = [defaultIoTState0_anotherId,
     defaultIoTState1_anotherId, defaultIoTState2_anotherId, defaultIoTState3_anotherId];
 
-const defaultIoTState1_new = new IoTState('endpointID', 'actuatorId1', 11);
-const defaultIoTState2_new = new IoTState('endpointID', 'actuatorId2', 12);
-const defaultIoTState3_new = new IoTState('endpointID', 'actuatorId3', 13);
+const defaultIoTState1_new = new IoTState('endpointID', 1, 11);
+const defaultIoTState2_new = new IoTState('endpointID', 2, 12);
+const defaultIoTState3_new = new IoTState('endpointID', 3, 13);
 
 const updatedIoTStates = [defaultIoTState1_new, defaultIoTState2_new, defaultIoTState3_new];
 
@@ -247,6 +247,31 @@ describe('IotController E2E', () => {
                 .end((err, res) => {
                     expect(res.body).toEqual([result[3], result[1]]);
                     expect(result[3].timestamp > result[1].timestamp).toBeTruthy();
+                    done();
+                });
+        });
+    });
+
+    describe('getEndPointSensors', () => {
+        it('GET /api/iot/v1/sensors/:endPointId should return [] if the customer does not exists', (done) => {
+            return request(app.getHttpServer())
+                .get('/api/iot/v1/sensors/endpoint')
+                .set('x-api_key', 'token')
+                .expect(404)
+                .end((err, res) => {
+                    expect(res.body.message).toEqual('CUSTOMER_NOT_FOUND');
+                    done();
+                });
+        });
+
+        it('GET /api/iot/v1/sensors/:endPointId should return [] if the endpoint does not exists', (done) => {
+            controller.actualSensor.set('customerId', new Map<string, IoTSensor[]>());
+            return request(app.getHttpServer())
+                .get('/api/iot/v1/sensors/endpoint')
+                .set('x-api_key', 'token')
+                .expect(404)
+                .end((err, res) => {
+                    expect(res.body.message).toEqual('ENDPOINT_NOT_FOUND');
                     done();
                 });
         });

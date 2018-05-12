@@ -5,6 +5,7 @@ import {IoTState, AuthenticationCredentials, IoTSensor} from 'platform-domain';
 import {Auth} from './webutils/RouteParamDecorators';
 import {v4 as uuid} from 'uuid';
 import {IoTData} from '../../platform-domain/src/IoT';
+import {RestNotFoundException} from './RestExceptions';
 
 export class TimeResponse {
     constructor(timeStamp: number) {
@@ -23,7 +24,7 @@ export class IoTController {
 
     actualState: IoTState[] = [];
     actualData = new Map<string, Map<number, IoTData[]>>();
-    actualSensor = new Map<string, Map<number, IoTSensor[]>>();
+    actualSensor = new Map<string, Map<string, IoTSensor[]>>();
 
     @ApiOperation({title: 'Server Time', description: 'Returns the server time in epoch'})
     @ApiResponse({status: 200, type: TimeResponse})
@@ -58,27 +59,32 @@ export class IoTController {
     }
 
     @ApiOperation({title: 'Get the expected sensors', description: 'Returns the expected sensors for the endpoints'})
-    @Get('/sensors')
+    @Get('/sensors/:endPointId')
     @Roles('ROLE_ENDPOINT', 'ROLE_ADMIN')
-    getEndPointSensors(@Auth() auth: AuthenticationCredentials): IoTSensor[] {
-        return this.actualSensor.filter((value) => value.customerId === auth.customerId);
+    getEndPointSensors(@Auth() auth: AuthenticationCredentials, @Param('endPointId') endpointId: string): IoTSensor[] {
+        const customerEndpoints = this.actualSensor.get(auth.customerId);
+        if (!customerEndpoints) throw new RestNotFoundException('CUSTOMER_NOT_FOUND');
+        const endpointSensors = customerEndpoints.get(endpointId);
+        if (!endpointSensors) throw new RestNotFoundException('ENDPOINT_NOT_FOUND');
+        return endpointSensors;
     }
 
-    @ApiOperation({title: 'Set the Endpoints state', description: 'Returns the posted states'})
-    @Post('/sensors')
+    @ApiOperation({title: 'Set the Endpoints sensors', description: 'Returns the posted sensors'})
+    @Post('/sensors/:endPointId')
     @Roles('ROLE_ADMIN')
-    postEndPointSensor(@Auth() auth: AuthenticationCredentials, @Body() states: IoTState[]): IoTState[] {
-        states.forEach((value) => {
+    postEndPointSensor(@Auth() auth: AuthenticationCredentials, @Param('endPointId') endpointId: string,
+                       @Body() sensors: IoTSensor[]): IoTSensor[] {
+        sensors.forEach((value) => {
             value.customerId = auth.customerId;
             value.id = uuid();
-            value.timestamp = Date.now();
-            this.actualState = this.actualState
-                .filter(state => {
-                    return (state.endPointId !== value.endPointId || state.actuatorId !== value.actuatorId);
-                });
         });
-        this.actualState = this.actualState.concat(states);
-        return states;
+        let customerSensors = this.actualSensor.get(auth.customerId);
+        if (!customerSensors) {
+            customerSensors = new Map<string, IoTSensor[]>();
+            this.actualSensor.set(auth.customerId, customerSensors);
+        }
+        customerSensors.set(endpointId, sensors);
+        return sensors;
     }
 
     @ApiOperation({title: 'Get the data for an given Endpoint', description: 'Returns the latest data for a given endpoint'})
