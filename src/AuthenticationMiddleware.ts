@@ -20,7 +20,6 @@ export class AuthenticationMiddleware implements NestMiddleware {
         ['ROLE_USER'], AuthenticationType.USER);
 
     static isAuthNotRequired(url: string) {
-        // console.log(`testing:${url}: ${url.startsWith('/api/auth/v1/gateway_key/')}`);
         if (url.startsWith('/api/auth/v1/gateway_key/')) return true;
         return false;
     }

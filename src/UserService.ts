@@ -22,11 +22,14 @@ export class UserService {
 
     async findByUsernameAndPassword(username: string, password: string): Promise<User> {
         const foundUser = this.users.find(user => user.email === username);
-        // console.log(`username:${username}, password:${password} foundUser: ${JSON.stringify(foundUser)}`)
         if (!isNullOrUndefined(foundUser)) {
             const match = await bcrypt.compare(password, foundUser.passwordHash);
             if (match) return foundUser;
         }
         return null;
+    }
+
+    async findById(id: string): Promise<User> {
+        return new Promise<User>(((resolve, reject) => resolve(this.users.find(user => user.id === id))));
     }
 }

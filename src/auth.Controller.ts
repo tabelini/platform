@@ -4,11 +4,16 @@ import {TimeResponse} from './iotController';
 import {RestNotFoundException} from './RestExceptions';
 import uuid = require('uuid');
 import {Auth} from './webutils/RouteParamDecorators';
-import {AuthenticationCredentials} from 'platform-domain';
+import {AuthenticationCredentials, LoginResponse} from 'platform-domain';
+import {UserService} from './UserService';
+import * as _ from 'lodash';
 
 @ApiUseTags('Auth')
 @Controller('/api/auth/v1')
 export class AuthController {
+
+    constructor(private us: UserService) {
+    }
 
     @ApiOperation({title: 'Gateway API KEY', description: 'Returns the gateway API key according to the Id'})
     @ApiResponse({status: 200, type: TimeResponse})
@@ -21,7 +26,12 @@ export class AuthController {
     @ApiOperation({title: 'Gets the Authentication TOKEN', description: 'Returns the authentication token'})
     @ApiResponse({status: 200})
     @Get('/token')
-    getToken(@Auth() auth: AuthenticationCredentials): any {
-        return {token: `${auth.id}:${uuid.v4()}`};
+    async getToken(@Auth() auth: AuthenticationCredentials): Promise<LoginResponse> {
+        const foundUser = await this.us.findById(auth.id);
+        const returnedUser = _.clone(foundUser);
+        if (foundUser) {
+            returnedUser.passwordHash = null;
+        }
+        return {token: `${auth.id}:${uuid.v4()}`, user: returnedUser};
     }
 }
