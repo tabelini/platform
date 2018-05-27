@@ -4,7 +4,7 @@ import {ApiBearerAuth, ApiModelProperty, ApiOperation, ApiResponse, ApiUseTags} 
 import {IoTState, AuthenticationCredentials, IoTSensor, TimeCondition, SensorCondition} from 'platform-domain';
 import {Auth} from './webutils/RouteParamDecorators';
 import {v4 as uuid} from 'uuid';
-import {IoTData} from '../../platform-domain/src/IoT';
+import {IoTData, IoTOperator} from '../../platform-domain/src/IoT';
 import {RestNotFoundException} from './RestExceptions';
 
 export class TimeResponse {
@@ -40,7 +40,26 @@ export class IoTController {
     @Get('/state')
     @Roles('ROLE_ENDPOINT', 'ROLE_ADMIN')
     getEndPointState(@Auth() auth: AuthenticationCredentials): IoTState[] {
-        return this.actualState.filter((value) => value.customerId === auth.customerId);
+        const now = Date.now();
+        const result = this.actualState
+            .filter((state) => state.customerId === auth.customerId);
+        result.forEach((state) => {
+            const requestedCondition = this.actualSensorCondition
+                .find((condition) => {
+                    // console.log(`Testing condition:${JSON.stringify(condition)}`);
+                    // console.log(`Testing endPointId:${condition.endPointId === state.endPointId}`);
+                    // console.log(`Testing actuatorId:${condition.actuatorId === state.actuatorId}`);
+                    // console.log(`Testing time:${(condition.lastTimeOn + condition.latchTime * 1000) > now}`);
+                    return (condition.endPointId === state.endPointId
+                        && condition.actuatorId === state.actuatorId
+                        && (condition.lastTimeOn + condition.latchTime * 1000) > now);
+                });
+            console.log(`Found condition:${JSON.stringify(requestedCondition)}`);
+            if (requestedCondition) {
+                state.value = requestedCondition.value;
+            }
+        });
+        return result;
     }
 
     @ApiOperation({title: 'Set the Endpoints state', description: 'Returns the posted states'})
@@ -125,6 +144,7 @@ export class IoTController {
             }
             sensorData.unshift(val);
             endpoint.set(val.sensorId, sensorData);
+            this.processSensorCondition(val);
         });
         return data;
     }
@@ -153,5 +173,18 @@ export class IoTController {
             });
         this.actualSensorCondition = this.actualSensorCondition.concat(conditions);
         return this.actualSensorCondition;
+    }
+
+    processSensorCondition(data: IoTData) {
+        this.actualSensorCondition.forEach(condition => {
+            if (condition.sensorEndPointId === data.endPointId && condition.sensorId === data.sensorId) {
+                if (condition.operator === IoTOperator.GREATER_THAN) {
+                    if (data.value <= condition.referenceValues[0]) return;
+                } else if (condition.operator === IoTOperator.LESS_THAN) {
+                    if (data.value >= condition.referenceValues[0]) return;
+                }
+                condition.lastTimeOn = Date.now();
+            }
+        });
     }
 }
