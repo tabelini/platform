@@ -56,6 +56,8 @@ export class IoTController {
             console.log(`Found condition:${JSON.stringify(requestedCondition)}`);
             if (requestedCondition) {
                 state.value = requestedCondition.value;
+            }else {
+                state.value = state.defaultValue;
             }
         });
         return result;
