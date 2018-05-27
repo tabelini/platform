@@ -1,10 +1,9 @@
 import {Roles} from './webutils/Guards';
 import {Body, Controller, Get, Logger, Param, Post} from '@nestjs/common';
 import {ApiBearerAuth, ApiModelProperty, ApiOperation, ApiResponse, ApiUseTags} from '@nestjs/swagger';
-import {IoTState, AuthenticationCredentials, IoTSensor, TimeCondition, SensorCondition} from 'platform-domain';
+import {IoTState, AuthenticationCredentials, IoTSensor, TimeCondition, SensorCondition, IoTData, IoTOperator} from 'platform-domain';
 import {Auth} from './webutils/RouteParamDecorators';
 import {v4 as uuid} from 'uuid';
-import {IoTData, IoTOperator} from '../../platform-domain/src/IoT';
 import {RestNotFoundException} from './RestExceptions';
 
 export class TimeResponse {
