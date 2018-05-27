@@ -4,7 +4,7 @@ import {TimeResponse} from './iotController';
 import {RestNotFoundException} from './RestExceptions';
 import uuid = require('uuid');
 import {Auth} from './webutils/RouteParamDecorators';
-import {AuthenticationCredentials, LoginResponse} from 'platform-domain';
+import {AuthenticationCredentials, LoginResponse, User} from 'platform-domain';
 import {UserService} from './UserService';
 import * as _ from 'lodash';
 
@@ -27,11 +27,24 @@ export class AuthController {
     @ApiResponse({status: 200})
     @Get('/token')
     async getToken(@Auth() auth: AuthenticationCredentials): Promise<LoginResponse> {
-        const foundUser = await this.us.findById(auth.id);
+        const userToReturn = await this.getUserToReturnById(auth.id);
+        return {token: `${auth.id}:${uuid.v4()}`, user: userToReturn};
+    }
+
+    @ApiOperation({title: 'Gets the Current User', description: 'Returns the current user'})
+    @ApiResponse({status: 200})
+    @Get('/current_user')
+    async getCurrentUser(@Auth() auth: AuthenticationCredentials): Promise<User> {
+        return await this.getUserToReturnById(auth.id);
+    }
+
+    async getUserToReturnById(id: string): Promise<User> {
+        const foundUser = await this.us.findById(id);
         const returnedUser = _.clone(foundUser);
         if (foundUser) {
             returnedUser.passwordHash = null;
         }
-        return {token: `${auth.id}:${uuid.v4()}`, user: returnedUser};
+        return returnedUser;
     }
+
 }

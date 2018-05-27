@@ -1,7 +1,7 @@
 import {Roles} from './webutils/Guards';
 import {Body, Controller, Get, Logger, Param, Post} from '@nestjs/common';
 import {ApiBearerAuth, ApiModelProperty, ApiOperation, ApiResponse, ApiUseTags} from '@nestjs/swagger';
-import {IoTState, AuthenticationCredentials, IoTSensor} from 'platform-domain';
+import {IoTState, AuthenticationCredentials, IoTSensor, TimeCondition, SensorCondition} from 'platform-domain';
 import {Auth} from './webutils/RouteParamDecorators';
 import {v4 as uuid} from 'uuid';
 import {IoTData} from '../../platform-domain/src/IoT';
@@ -25,6 +25,8 @@ export class IoTController {
     actualState: IoTState[] = [];
     actualData = new Map<string, Map<number, IoTData[]>>();
     actualSensor = new Map<string, Map<string, IoTSensor[]>>();
+    actualTimeCondition = new Map<string, TimeCondition[]>();
+    actualSensorCondition: SensorCondition[] = [];
 
     @ApiOperation({title: 'Server Time', description: 'Returns the server time in epoch'})
     @ApiResponse({status: 200, type: TimeResponse})
@@ -125,5 +127,31 @@ export class IoTController {
             endpoint.set(val.sensorId, sensorData);
         });
         return data;
+    }
+
+    @ApiOperation({title: 'Gets all the sensor conditions', description: 'Returns all the SensorConditions for the customer'})
+    @Get('/sensor_condition')
+    @Roles('ROLE_ENDPOINT', 'ROLE_ADMIN')
+    getSensorCondition(@Auth() auth: AuthenticationCredentials): SensorCondition[] {
+        return this.actualSensorCondition.filter((value) => value.customerId === auth.customerId);
+    }
+
+    @ApiOperation({title: 'Set the sensor condition', description: 'Returns the posted states'})
+    @Post('/sensor_condition/endpoint/:endPointId')
+    @Roles('ROLE_ADMIN')
+    postSensorCondition(@Auth() auth: AuthenticationCredentials, @Body() conditions: SensorCondition[],
+                        @Param('endPointId') endPointId: string): SensorCondition[] {
+        conditions.forEach((value) => {
+            value.endPointId = endPointId;
+            value.customerId = auth.customerId;
+            value.id = uuid();
+            value.timestamp = Date.now();
+        });
+        this.actualSensorCondition = this.actualSensorCondition
+            .filter(condition => {
+                return (condition.endPointId !== condition.endPointId);
+            });
+        this.actualSensorCondition = this.actualSensorCondition.concat(conditions);
+        return this.actualSensorCondition;
     }
 }

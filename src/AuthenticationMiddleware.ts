@@ -9,6 +9,8 @@ export class AuthenticationMiddleware implements NestMiddleware {
 
     static readonly apiKeyHeader = 'x-api_key';
 
+    static readonly tokenHeader = 'x-token';
+
     static readonly defaultTokenAuth = new AuthenticationCredentials('id', 'customerId',
         ['ROLE_ROOT'], AuthenticationType.TOKEN);
     static readonly limitedTokenAuth = new AuthenticationCredentials('id2', 'customerId2',
@@ -25,7 +27,6 @@ export class AuthenticationMiddleware implements NestMiddleware {
     }
 
     constructor(private us: UserService) {
-
     }
 
     readonly logger = new Logger('AuthenticationMiddleware');
@@ -36,8 +37,13 @@ export class AuthenticationMiddleware implements NestMiddleware {
             else {
                 if (req.headers) {
                     const apiKey = req.headers[AuthenticationMiddleware.apiKeyHeader];
+                    const token = req.headers[AuthenticationMiddleware.tokenHeader];
                     if (apiKey) {
                         req.auth = AuthenticationMiddleware.defaultTokenAuth;
+                    } else if (token) {
+                        const id = token.toString().split(':')[0];
+                        const user = await this.us.findById(id);
+                        req.auth = new AuthenticationCredentials(user.id, user.customerId, user.roles, AuthenticationType.USER);
                     } else {
                         if (req.headers.authorization) {
                             const auth = basicAuth(req);
