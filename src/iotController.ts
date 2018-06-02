@@ -1,10 +1,10 @@
 import {Roles} from './webutils/Guards';
-import {Body, Controller, Get, Logger, Param, Post} from '@nestjs/common';
+import {Body, Controller, Delete, Get, Logger, Param, Post} from '@nestjs/common';
 import {ApiBearerAuth, ApiModelProperty, ApiOperation, ApiResponse, ApiUseTags} from '@nestjs/swagger';
-import {IoTState, AuthenticationCredentials, IoTSensor, TimeCondition, SensorCondition, IoTData, IoTOperator} from 'platform-domain';
+import {IoTState, AuthenticationCredentials, IoTSensor, TimeCondition, SensorCondition, IoTData, IoTOperator, EndPoint} from 'platform-domain';
 import {Auth} from './webutils/RouteParamDecorators';
 import {v4 as uuid} from 'uuid';
-import {RestNotFoundException} from './RestExceptions';
+import {RestForbiddenException, RestNotFoundException} from './RestExceptions';
 
 export class TimeResponse {
     constructor(timeStamp: number) {
@@ -24,6 +24,7 @@ export class IoTController {
     actualState: IoTState[] = [];
     actualData = new Map<string, Map<number, IoTData[]>>();
     actualSensor = new Map<string, Map<string, IoTSensor[]>>();
+    actualEndPoints = new Map<string, EndPoint>();
     actualTimeCondition = new Map<string, TimeCondition[]>();
     actualSensorCondition: SensorCondition[] = [];
 
@@ -45,18 +46,13 @@ export class IoTController {
         result.forEach((state) => {
             const requestedCondition = this.actualSensorCondition
                 .find((condition) => {
-                    // console.log(`Testing condition:${JSON.stringify(condition)}`);
-                    // console.log(`Testing endPointId:${condition.endPointId === state.endPointId}`);
-                    // console.log(`Testing actuatorId:${condition.actuatorId === state.actuatorId}`);
-                    // console.log(`Testing time:${(condition.lastTimeOn + condition.latchTime * 1000) > now}`);
                     return (condition.endPointId === state.endPointId
                         && condition.actuatorId === state.actuatorId
                         && (condition.lastTimeOn + condition.latchTime * 1000) > now);
                 });
-            console.log(`Found condition:${JSON.stringify(requestedCondition)}`);
             if (requestedCondition) {
                 state.value = requestedCondition.value;
-            }else {
+            } else {
                 state.value = state.defaultValue;
             }
         });
@@ -157,7 +153,7 @@ export class IoTController {
         return this.actualSensorCondition.filter((value) => value.customerId === auth.customerId);
     }
 
-    @ApiOperation({title: 'Set the sensor condition', description: 'Returns the posted states'})
+    @ApiOperation({title: 'Set the sensor condition', description: 'Returns the posted sensor conditions'})
     @Post('/sensor_condition/endpoint/:endPointId')
     @Roles('ROLE_ADMIN')
     postSensorCondition(@Auth() auth: AuthenticationCredentials, @Body() conditions: SensorCondition[],
@@ -174,6 +170,81 @@ export class IoTController {
             });
         this.actualSensorCondition = this.actualSensorCondition.concat(conditions);
         return this.actualSensorCondition;
+    }
+
+    @ApiOperation({title: 'Gets all the time conditions', description: 'Returns all the TimeConditions for the endPoint'})
+    @Get('/time_condition/endpoint/:endPointId')
+    @Roles('ROLE_ENDPOINT', 'ROLE_ADMIN')
+    getTimeCondition(@Auth() auth: AuthenticationCredentials, @Param('endPointId') endPointId: string): TimeCondition[] {
+        return this.actualTimeCondition.get(endPointId);
+    }
+
+    @ApiOperation({title: 'Set the time condition', description: 'Returns the posted sensor conditions'})
+    @Post('/time_condition/endpoint/:endPointId')
+    @Roles('ROLE_ADMIN')
+    postTimeCondition(@Auth() auth: AuthenticationCredentials, @Body() conditions: TimeCondition[],
+                      @Param('endPointId') endPointId: string): TimeCondition[] {
+        conditions.forEach((condition) => {
+            condition.endPointId = endPointId;
+            condition.customerId = auth.customerId;
+            condition.id = uuid();
+            condition.timestamp = Date.now();
+            this.actualTimeCondition.set(condition.endPointId, conditions);
+        });
+        return conditions;
+    }
+
+    @ApiOperation({title: 'Gets all the EndPoints', description: 'Returns all the EndPoints'})
+    @Get('/endpoint')
+    @Roles('ROLE_ADMIN')
+    getEndPoints(@Auth() auth: AuthenticationCredentials): EndPoint[] {
+        const customerEndPoints: EndPoint[] = [];
+        this.actualEndPoints.forEach((endPoint, key) => {
+            if (endPoint.customerId === auth.customerId) customerEndPoints.push(endPoint);
+        });
+        return customerEndPoints;
+    }
+
+    @ApiOperation({title: 'Gets and EndPoint', description: 'Returns the endpoint with the given id'})
+    @Get('/endpoint/:endPointId')
+    @Roles('ROLE_ADMIN')
+    getEndPoint(@Auth() auth: AuthenticationCredentials, @Param('endPointId') endPointId: string): EndPoint {
+        const endPoint = this.actualEndPoints.get(endPointId);
+        if (endPoint) {
+            if (endPoint.customerId !== auth.customerId) {
+                throw  new RestForbiddenException('WRONG_CUSTOMER_ID');
+            }
+            return endPoint;
+        } else {
+            throw new RestNotFoundException('NOT_FOUND');
+        }
+    }
+
+    @ApiOperation({title: 'Post an EndPoint', description: 'Creates a new endPoint'})
+    @Post('/endpoint')
+    @Roles('ROLE_ADMIN')
+    createEndPoint(@Auth() auth: AuthenticationCredentials, @Body() endPoint: EndPoint): EndPoint {
+        endPoint.timestamp = Date.now();
+        endPoint.customerId = auth.customerId;
+        endPoint.id = uuid();
+        this.actualEndPoints.set(endPoint.id, endPoint);
+        return endPoint;
+    }
+
+    @ApiOperation({title: 'Deletes an EndPoint', description: 'Deletes and EndPoint with the given Id'})
+    @Delete('/endpoint/:endPointId')
+    @Roles('ROLE_ADMIN')
+    deleteEndPoint(@Auth() auth: AuthenticationCredentials, @Param('endPointId') endPointId: string): EndPoint {
+        const endPoint = this.actualEndPoints.get(endPointId);
+        if (endPoint) {
+            if (endPoint.customerId !== auth.customerId) {
+                throw  new RestForbiddenException('WRONG_CUSTOMER_ID');
+            }
+            this.actualEndPoints.delete(endPointId);
+            return endPoint;
+        } else {
+            throw new RestNotFoundException('NOT_FOUND');
+        }
     }
 
     processSensorCondition(data: IoTData) {
