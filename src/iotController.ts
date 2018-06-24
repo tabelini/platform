@@ -5,6 +5,7 @@ import {IoTState, AuthenticationCredentials, IoTSensor, TimeCondition, SensorCon
 import {Auth} from './webutils/RouteParamDecorators';
 import {v4 as uuid} from 'uuid';
 import {RestForbiddenException, RestNotFoundException} from './RestExceptions';
+import {isNullOrUndefined} from 'util';
 
 export class TimeResponse {
     constructor(timeStamp: number) {
@@ -25,11 +26,8 @@ export class IoTController {
     actualData = new Map<string, Map<number, IoTData[]>>();
     actualSensor = new Map<string, Map<string, IoTSensor[]>>();
     actualEndPoints = new Map<string, EndPoint>();
-    actualTimeCondition = new Map<string, TimeCondition[]>();
+    actualTimeCondition: TimeCondition[] = [];
     actualSensorCondition: SensorCondition[] = [];
-    everySecondJob = setInterval(() => {
-        console.log(`running at ${new Date()}`);
-    }, 1000)
 
     @ApiOperation({title: 'Server Time', description: 'Returns the server time in epoch'})
     @ApiResponse({status: 200, type: TimeResponse})
@@ -47,16 +45,26 @@ export class IoTController {
         const result = this.actualState
             .filter((state) => state.customerId === auth.customerId);
         result.forEach((state) => {
-            const requestedCondition = this.actualSensorCondition
+            const requestedSensorCondition = this.actualSensorCondition
                 .find((condition) => {
                     return (condition.endPointId === state.endPointId
                         && condition.actuatorId === state.actuatorId
                         && (condition.lastTimeOn + condition.latchTime * 1000) > now);
                 });
-            if (requestedCondition) {
-                state.value = requestedCondition.value;
+            if (requestedSensorCondition) {
+                state.value = requestedSensorCondition.value;
             } else {
-                state.value = state.defaultValue;
+                const requestedTimeCondition = this.actualTimeCondition
+                    .find((condition) => {
+                        return (condition.endPointId === state.endPointId
+                            && condition.actuatorId === state.actuatorId
+                            && this.isInTimeRange(condition, new Date()));
+                    });
+                if (requestedTimeCondition) {
+                    state.value = requestedTimeCondition.value;
+                } else {
+                    state.value = state.defaultValue;
+                }
             }
         });
         return result;
@@ -179,7 +187,7 @@ export class IoTController {
     @Get('/time_condition/endpoint/:endPointId')
     @Roles('ROLE_ENDPOINT', 'ROLE_ADMIN')
     getTimeCondition(@Auth() auth: AuthenticationCredentials, @Param('endPointId') endPointId: string): TimeCondition[] {
-        return this.actualTimeCondition.get(endPointId);
+        return this.actualTimeCondition.filter((value) => value.endPointId === endPointId);
     }
 
     @ApiOperation({title: 'Set the time condition', description: 'Returns the posted sensor conditions'})
@@ -187,14 +195,18 @@ export class IoTController {
     @Roles('ROLE_ADMIN')
     postTimeCondition(@Auth() auth: AuthenticationCredentials, @Body() conditions: TimeCondition[],
                       @Param('endPointId') endPointId: string): TimeCondition[] {
-        conditions.forEach((condition) => {
-            condition.endPointId = endPointId;
-            condition.customerId = auth.customerId;
-            condition.id = uuid();
-            condition.timestamp = Date.now();
-            this.actualTimeCondition.set(condition.endPointId, conditions);
+        conditions.forEach((value) => {
+            value.endPointId = endPointId;
+            value.customerId = auth.customerId;
+            value.id = uuid();
+            value.timestamp = Date.now();
         });
-        return conditions;
+        this.actualTimeCondition = this.actualTimeCondition
+            .filter(condition => {
+                return (condition.endPointId !== condition.endPointId);
+            });
+        this.actualTimeCondition = this.actualTimeCondition.concat(conditions);
+        return this.actualTimeCondition;
     }
 
     @ApiOperation({title: 'Gets all the EndPoints', description: 'Returns all the EndPoints'})
@@ -261,5 +273,48 @@ export class IoTController {
                 condition.lastTimeOn = Date.now();
             }
         });
+    }
+
+    isInTimeRange(condition: TimeCondition, date: Date): boolean {
+        return this.isHourInRange(date, condition.timeRange) && this.isWeekDayInRange(date, condition.weekDays)
+            && this.isMonthInRange(date, condition.months) && this.isDayInRange(date, condition.days);
+    }
+
+    isHourInRange(date: Date, timeRange: string): boolean {
+        const times = timeRange.split('-');
+        const startTime = times[0].split(':');
+        const endTime = times[1].split(':');
+        const startDate = new Date(date.getTime());
+        startDate.setHours(parseInt(startTime[0], 10), parseInt(startTime[1], 10), 0, 0);
+        const endDate = new Date(date.getTime());
+        endDate.setHours(parseInt(endTime[0], 10), parseInt(endTime[1], 10));
+        return date.getTime() >= startDate.getTime() && date.getTime() <= endDate.getTime();
+    }
+
+    isWeekDayInRange(date: Date, weekDays: number[]): boolean {
+        if (isNullOrUndefined(weekDays)) {
+            return true;
+        }
+        const weekDay = date.getDay();
+        const found = weekDays.find((day) => day === weekDay);
+        return !isNullOrUndefined(found);
+    }
+
+    isMonthInRange(date: Date, months: number[]): boolean {
+        if (isNullOrUndefined(months)) {
+            return true;
+        }
+        const month = date.getMonth();
+        const found = months.find((day) => day === month);
+        return !isNullOrUndefined(found);
+    }
+
+    isDayInRange(date: Date, days: number[]): boolean {
+        if (isNullOrUndefined(days)) {
+            return true;
+        }
+        const dayNumber = date.getDate();
+        const found = days.find((day) => day === dayNumber);
+        return !isNullOrUndefined(found);
     }
 }

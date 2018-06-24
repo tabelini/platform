@@ -3,7 +3,7 @@ import {IoTController} from './iotController';
 import {INestApplication} from '@nestjs/common';
 import {AppModule} from './app.module';
 import request from 'supertest';
-import {AuthenticationCredentials, AuthenticationType, IoTState} from 'platform-domain';
+import {AuthenticationCredentials, AuthenticationType, IoTState, TimeCondition} from 'platform-domain';
 import {IoTData, IoTSensor} from '../../platform-domain';
 
 const defaultAuthentication = new AuthenticationCredentials('id', 'customerId',
@@ -12,18 +12,18 @@ const defaultAuthentication = new AuthenticationCredentials('id', 'customerId',
 const anotherAuthentication = new AuthenticationCredentials('id', 'customerId2',
     ['ROLE_ROOT'], AuthenticationType.TOKEN);
 
-const defaultIoTState0 = new IoTState('endpointID', 0, 10);
-const defaultIoTState1 = new IoTState('endpointID', 1, 11);
-const defaultIoTState2 = new IoTState('endpointID', 2, 12);
-const defaultIoTState3 = new IoTState('endpointID', 3, 13);
+const defaultIoTState0 = new IoTState('endpointID', 0, 10, 0);
+const defaultIoTState1 = new IoTState('endpointID', 1, 11, 0);
+const defaultIoTState2 = new IoTState('endpointID', 2, 12, 0);
+const defaultIoTState3 = new IoTState('endpointID', 3, 13, 0);
 
-const defaultIoTState0_anotherId = new IoTState('endpointID', 0, 10,
+const defaultIoTState0_anotherId = new IoTState('endpointID', 0, 10, 0,
     'id', 'customerId2');
-const defaultIoTState1_anotherId = new IoTState('endpointID', 1, 11,
+const defaultIoTState1_anotherId = new IoTState('endpointID', 1, 11, 0,
     'id', 'customerId2');
-const defaultIoTState2_anotherId = new IoTState('endpointID', 2, 12,
+const defaultIoTState2_anotherId = new IoTState('endpointID', 2, 12, 0,
     'id', 'customerId2');
-const defaultIoTState3_anotherId = new IoTState('endpointID', 3, 13,
+const defaultIoTState3_anotherId = new IoTState('endpointID', 3, 13, 0,
     'id', 'customerId2');
 
 const defaultIoTStates = [defaultIoTState0, defaultIoTState1, defaultIoTState2, defaultIoTState3];
@@ -31,9 +31,9 @@ const defaultIoTStates = [defaultIoTState0, defaultIoTState1, defaultIoTState2, 
 const defaultIoTStatesAnotherId = [defaultIoTState0_anotherId,
     defaultIoTState1_anotherId, defaultIoTState2_anotherId, defaultIoTState3_anotherId];
 
-const defaultIoTState1_new = new IoTState('endpointID', 1, 11);
-const defaultIoTState2_new = new IoTState('endpointID', 2, 12);
-const defaultIoTState3_new = new IoTState('endpointID', 3, 13);
+const defaultIoTState1_new = new IoTState('endpointID', 1, 11, 0);
+const defaultIoTState2_new = new IoTState('endpointID', 2, 12, 0);
+const defaultIoTState3_new = new IoTState('endpointID', 3, 13, 0);
 
 const updatedIoTStates = [defaultIoTState1_new, defaultIoTState2_new, defaultIoTState3_new];
 
@@ -274,6 +274,69 @@ describe('IotController E2E', () => {
                     expect(res.body.message).toEqual('ENDPOINT_NOT_FOUND');
                     done();
                 });
+        });
+    });
+
+    describe('isInTimeRange', () => {
+
+        const defaultCondition = new TimeCondition('endPointId', 1, 0,
+            '08:00-17:00');
+
+        const weekDayCondition = new TimeCondition('endPointId', 1, 0,
+            '08:00-17:00', [1, 2, 3, 4, 5]);
+
+        const monthCondition = new TimeCondition('endPointId', 1, 0,
+            '08:00-17:00', undefined, [1, 2, 3, 4, 5, 6]);
+
+        const dayCondition = new TimeCondition('endPointId', 1, 0,
+            '08:00-17:00', undefined, undefined, [1, 2, 3, 4, 5, 24]);
+
+        it('should return true when in the hour is in range', () => {
+            const date = new Date('2018-06-24T15:24:00');
+            const result = controller.isInTimeRange(defaultCondition, date);
+            expect(result).toBeTruthy();
+        });
+
+        it('should return false when in the hour is out of range', () => {
+            const date = new Date('2018-06-24T05:24:00');
+            const result = controller.isInTimeRange(defaultCondition, date);
+            expect(result).toBeFalsy();
+        });
+
+        it('should return true when in the week day is in range', () => {
+            const date = new Date('2018-06-25T15:24:00');
+            const result = controller.isInTimeRange(weekDayCondition, date);
+            expect(result).toBeTruthy();
+        });
+
+        it('should return false when in the week day is out of range', () => {
+            const date = new Date('2018-06-24T15:24:00');
+            const result = controller.isInTimeRange(weekDayCondition, date);
+            expect(result).toBeFalsy();
+        });
+
+        it('should return true when in the month is in range', () => {
+            const date = new Date('2018-06-24T15:24:00');
+            const result = controller.isInTimeRange(monthCondition, date);
+            expect(result).toBeTruthy();
+        });
+
+        it('should return false when in the month is out of range', () => {
+            const date = new Date('2018-08-24T15:24:00');
+            const result = controller.isInTimeRange(monthCondition, date);
+            expect(result).toBeFalsy();
+        });
+
+        it('should return true when in the day is in range', () => {
+            const date = new Date('2018-06-24T15:24:00');
+            const result = controller.isInTimeRange(dayCondition, date);
+            expect(result).toBeTruthy();
+        });
+
+        it('should return false when in the day is out of range', () => {
+            const date = new Date('2018-08-25T15:24:00');
+            const result = controller.isInTimeRange(dayCondition, date);
+            expect(result).toBeFalsy();
         });
     });
 });
