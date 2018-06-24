@@ -27,6 +27,9 @@ export class IoTController {
     actualEndPoints = new Map<string, EndPoint>();
     actualTimeCondition = new Map<string, TimeCondition[]>();
     actualSensorCondition: SensorCondition[] = [];
+    everySecondJob = setInterval(() => {
+        console.log(`running at ${new Date()}`);
+    }, 1000)
 
     @ApiOperation({title: 'Server Time', description: 'Returns the server time in epoch'})
     @ApiResponse({status: 200, type: TimeResponse})

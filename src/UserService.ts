@@ -32,4 +32,8 @@ export class UserService {
     async findById(id: string): Promise<User> {
         return new Promise<User>(((resolve, reject) => resolve(this.users.find(user => user.id === id))));
     }
+
+    async findByEmail(email: string): Promise<User> {
+        return new Promise<User>(((resolve, reject) => resolve(this.users.find(user => user.email === email))));
+    }
 }
